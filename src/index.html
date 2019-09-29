@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="UTF-8">
+	<title>Hello World!</title>
+	<style>
+		html, body {
+			margin: 0;
+			padding: 0;
+			border: 0;
+			width: 100%;
+			height: 100%;
+		}
+	</style>
+</head>
+<body>
+<script>
+// Node integration thanks to Electron -- otherwise script src these in <head> like normal
+const PIXI = require('PIXI.js');
+const planck = require('planck-js');
+const Vec2 = planck.Vec2;		// wegonna use this alot.
+
+class PhysicsState {
+	constructor() {
+		this.position = planck.Vec2(0,0);
+		this.angle = 0;
+		return this;
+	}
+	assign(position,a) {
+		this.position = planck.Vec2.clone(position);
+		this.angle = a;
+	}
+}
+
+// PIXI, rolling our own gameloop
+const renderer = new PIXI.Renderer({width: 1920, height: 1080, backgroundColor: 0x000000 });
+document.body.appendChild(renderer.view);
+
+const stage = new PIXI.Container();				// All layers go in here.
+const boundaryLayer = new PIXI.Container();		// draw outlines around our planck shapes
+const uiLayer = new PIXI.Container();			// the UI  rendered last (top)
+
+const boundaryGraphics = new PIXI.Graphics();
+boundaryLayer.addChild(boundaryGraphics);
+
+stage.addChild(boundaryLayer);
+stage.addChild(uiLayer);
+
+
+var text = new PIXI.Text('text', new PIXI.TextStyle({fill:'#ffffff'}));
+text.x = 10;
+text.y = 10;
+uiLayer.addChild(text);
+
+// Our PIXI... thing
+const texture = PIXI.Texture.from('bunny.png');
+
+/*
+	Box2d was designed with a MKS (meters kilograms seconds) unit system.  As such, it's built for that scale.
+	Render libraries such as PIXI operate in pixels, though, so we must convert between box2d world units, and
+	PIXI world units.
+
+	In fact, it's detrimental to box2d to use really large scales without modifying some internal settings.
+	For example, box2d has a limit on how many units it will advance each tick (2).  At 1:1 ratio between pixels
+	and box2d units (meters), you'd only be able to move at 2 meters per second.  Hence why scaling is so vital.
+
+	If you use a modest scale like 50:1, you can model a world where your max speed is 100m/s (360km/h or 224mph),
+	which is pretty fast for most situations.
+
+	Try to imagine your game running in a very small instance, screen space wise.  Box2d should be limited to objects
+	sized 1 to 10 meters in size, and we need to represent that in pixels.  Another method to do this would be to 
+	change the webGL projection matrix, so you literally just render everything with inflated projection.  Alas,
+	I do not know how to do this with PIXI as it sits.  Perhaps with the pixi-projection plugin, but I am uncertain.
+*/
+var PixelsPerMeter = 50;					// 1 meter = 50 pixels
+var MetersPerPixel = 1/PixelsPerMeter;		// .02 meter = 1 pixel
+var scalingOn = true;						// Toggle to see what the game looks like in box2d sizes =)
+var drawLines = true;						// Draw Debug lines
+// Timing
+var gameTime = 0;
+var lastTime = 0;
+var frameTime = 0;
+var accumulator = 0;
+var timestep = 1000/30;						// run 60 fixed physics steps, per second
+var deltaTime = deltaTime/1000;				// 0.0167: saves us frequent division while running (it's a fixed timestep)
+var interpolation = true;					// Draw pixi objects between physics states for smoother animation.
+
+// Planck
+var world = planck.World({
+	gravity: Vec2(0,9.81)			// approximate normal earth gravity
+});
+console.log(world)
+// Objects to play with.  Box2d objects are modelled as a body->fixture->shape.
+var player = world.createDynamicBody({
+		position:Vec2((renderer.screen.width/2)*MetersPerPixel,5),
+		userData: {
+			myType: "player",
+			lastState: new PhysicsState()
+		}
+	});
+player.createFixture(planck.Circle(2));
+
+console.log(player)
+
+var ground = world.createBody({
+		userData: {
+			myType: "boundary",
+			label:"ground"
+		}
+	});
+ground.createFixture(planck.Edge(Vec2(1918*MetersPerPixel,0),Vec2(1918*MetersPerPixel,1000*MetersPerPixel)));
+ground.createFixture(planck.Edge(Vec2(0,1000*MetersPerPixel),Vec2(1920*MetersPerPixel,1000*MetersPerPixel)));
+ground.createFixture(planck.Edge(Vec2(2*MetersPerPixel,0),Vec2(2*MetersPerPixel,1000*MetersPerPixel)));
+
+function step(t) {
+	if(lastTime) {
+		frameTime = t - lastTime;
+		if(frameTime > 250)
+			frameTime = 250;
+		accumulator += frameTime;
+		while(accumulator >= timestep) {
+			world.step(deltaTime);				// step box2d
+			gameTime += timestep;
+			accumulator -= timestep;
+		}
+		render();								// Them sweet pixels output by PIXI
+	}
+	lastTime = t;
+	requestAnimationFrame(step);
+}
+
+/* 
+	We position our "sprites" between physics states.
+	This means we're 1 step behind, visually.
+	However, we're smoother.  
+
+	Lower the timestep to 10-20, and disable interpolation
+	for a visual on what this does.
+*/
+
+//interpolate
+/*
+		if(!this.physicsBody.isStatic()) {
+			//console.log('current: %s (%s), last: %s (%s)',this.physicsBody.getPosition().y, this.physicsBody.getAngle(), this.physicsLast.position.y, this.physicsLast.angle);
+			this.container.x = (this.physicsBody.getPosition().x * alpha) * PPM + (this.physicsLast.position.x * (1-alpha)) * PPM;
+			this.container.y = (this.physicsBody.getPosition().y * alpha) * PPM + (this.physicsLast.position.y * (1-alpha)) * PPM;
+		}
+		this.container.rotation = this.physicsBody.getAngle() * alpha + this.physicsLast.angle * (1-alpha);
+		//debug draw
+		this.debugLines.rotation = this.physicsBody.getAngle() * alpha + this.physicsLast.angle * (1-alpha);
+		this.debugLines.x = this.container.x;
+		this.debugLines.y = this.container.y;
+    	this.debugLines.clear();
+    	this.debugLines.lineStyle(2, 0xFEEB77, 1);
+		for(var fixture = this.physicsBody.getFixtureList(); fixture; fixture = fixture.getNext()) {
+			var shape = fixture.getShape();
+			this.debugLines.moveTo(shape.getVertex(0).x*PPM, shape.getVertex(0).y*PPM)
+			for(var v = 1; v < shape.m_count; v++) {
+				this.debugLines.lineTo(shape.getVertex(v).x*PPM,shape.getVertex(v).y*PPM);
+			}
+		}
+		this.debugLines.lineTo(shape.getVertex(0).x*PPM, shape.getVertex(0).y*PPM);
+		this.debugLines.endFill();
+*/
+function drawText() {
+	text.text = "Steps: " + world.m_stepCount + " ("+(world.m_stepCount / (gameTime/1000)).toFixed(2) + "/sec)";
+	text.text += "\nPlayer: " + player.getPosition();
+}
+
+function render() {
+	// Planck.js maintained box2d quite enthusiastically, including not-very-js ways of doing things.
+	// Being a C++ library written in ~2007, it iterates strangely for javascript programmers =)
+	boundaryGraphics.clear();
+	for (var body = world.getBodyList(); body; body = body.getNext()) {
+		for (var fixture = body.getFixtureList(); fixture; fixture = fixture.getNext()) {
+			var shape = fixture.getShape();	// we are assuming one fixture, otherwise we'd step into this as well
+			if(interpolation && !body.isStatic()) {
+
+			}
+			if(drawLines) {
+				var userData = body.getUserData();
+				if(fixture.getType() == 'circle') {
+					boundaryGraphics.lineStyle(1,0xFEEB77,1);
+					boundaryGraphics.drawCircle(body.getPosition().x*PixelsPerMeter,body.getPosition().y*PixelsPerMeter,50)
+					boundaryGraphics.endFill();
+				}
+				if(fixture.getType() == 'polygon') {
+					boundaryGraphics.lineStyle(1,0xFEEB77,1);
+					boundaryGraphics.moveTo(shape.getVertex(0).x*PixelsPerMeter, shape.getVertex(0).y*PixelsPerMeter);
+					for(var v = 1; v < shape.m_count; v++) {
+						boundaryGraphics.lineTo(shape.getVertex(v).x*PixelsPerMeter, shape.getVertex(v).y*PixelsPerMeter);
+					}
+					boundaryGraphics.lineTo(shape.getVertex(0).x*PixelsPerMeter, shape.getVertex(0).y*PixelsPerMeter);
+				}
+				if(shape.getType() == 'edge') {
+					boundaryGraphics.lineStyle(3,0xFEEB77,1);
+					boundaryGraphics.moveTo(shape.m_vertex1.x*PixelsPerMeter,shape.m_vertex1.y*PixelsPerMeter);
+					boundaryGraphics.lineTo(shape.m_vertex2.x*PixelsPerMeter,shape.m_vertex2.y*PixelsPerMeter);
+				}
+			}
+		}
+	}
+	boundaryGraphics.endFill();
+	drawText();
+	renderer.render(stage);
+}
+
+requestAnimationFrame(step);
+
+// Some simple classes, for sanity.
+
+class BoxObject {
+	constructor(opts) {									// x,y,sizeX,sizeY,stage,color,physicsWorld,fixtureOptions
+		this.sprite = new PIXI.Graphics();				// I mean, a sprite would normally be a texture but simple geometry works for our needs.
+		this.container = new PIXI.Container();			// If we containerize our whole object, everything stays together nicely.
+
+		this.body = physicsWorld.createBody();
+		// box2d builds shapes from it's center of mass origin
+		// aka, this is radius*2, so we half what we send, because that makes sense in my head (300px means 300px, not 150!)
+		// ...and don't forget to scale it.
+		this.body.createFixture(planck.Box(opts.sizeX/2/PPM,opts.sizeY/2/PPM),fixtureOptions);
+		this.body.setPosition(planck.Vec2(x,y));
+
+		// Our sprite is just a box.
+		this.sprite.beginFill(opts.color);
+		this.sprite.drawRect(x, y, opts.sizeX, opts.sizeY);
+		this.sprite.endFill();
+
+		// center origin works for most folks, and box2d uses center of mass as well, so we do this now.
+		this.sprite.pivot.x = this.sprite.width / 2;
+		this.sprite.pivot.y = this.sprite.height / 2;
+		this.container.pivot.x = this.container.width / 2;
+		this.container.pivot.y = this.container.height / 2;
+
+		this.container.addChild(this.sprite);
+
+		stage.add(this.container);
+		debugLines.addChild(this.debugLines);				// Add shape outlines above object layer.
+	}
+}
+</script>
+</body>
+</html>
