@@ -24,10 +24,10 @@ class PhysicsState {
 	constructor() {
 		this.position = planck.Vec2(0,0);
 		this.angle = 0;
-		return this;
+		//return this;
 	}
 	assign(position,a) {
-		this.position = planck.Vec2.clone(position);
+		this.position = planck.Vec2.clone(position);		// Don't let them references bite ya
 		this.angle = a;
 	}
 }
@@ -36,26 +36,37 @@ class PhysicsState {
 const renderer = new PIXI.Renderer({width: 1920, height: 1080, backgroundColor: 0x000000 });
 document.body.appendChild(renderer.view);
 
+const loader = PIXI.Loader.shared; 				// for v5+.  In v4 Loader should be lowercased?
+
 const stage = new PIXI.Container();				// All layers go in here.
-const boundaryLayer = new PIXI.Container();		// draw outlines around our planck shapes
+const spriteLayer = new PIXI.Container();		// Sprites in here.
+const debugLayer = new PIXI.Container();		// draw outlines around our planck shapes
 const uiLayer = new PIXI.Container();			// the UI  rendered last (top)
 
-const boundaryGraphics = new PIXI.Graphics();
-boundaryLayer.addChild(boundaryGraphics);
+const boundaryGraphics = new PIXI.Graphics();	// our stage boundaries are on their own graphics object we handle
+debugLayer.addChild(boundaryGraphics);			// in the way planck.js provides us (this is a demo afterall)
 
-stage.addChild(boundaryLayer);
+stage.addChild(spriteLayer);
+stage.addChild(debugLayer);
 stage.addChild(uiLayer);
 
-
 var text = new PIXI.Text('text', new PIXI.TextStyle({fill:'#ffffff'}));
-text.x = 10;
-text.y = 10;
+text.x = 25;
+text.y = 25;
 uiLayer.addChild(text);
 
-// Our PIXI... thing
-const texture = PIXI.Texture.from('bunny.png');
+// The PIXI bunny, whom is loved and adored
+loader.add('bunny','bunny.png')
+	.load( (loader,resources) => {
+		console.log("All files loaded!")
+	});
 
+console.log(loader.resources.bunny)
 /*
+	In order to even know what's going on, you have to read the manual.  https://box2d.org/manual.pdf
+
+	https://box2d.org/2011/12/pixels/
+
 	Box2d was designed with a MKS (meters kilograms seconds) unit system.  As such, it's built for that scale.
 	Render libraries such as PIXI operate in pixels, though, so we must convert between box2d world units, and
 	PIXI world units.
@@ -75,22 +86,26 @@ const texture = PIXI.Texture.from('bunny.png');
 var PixelsPerMeter = 50;					// 1 meter = 50 pixels
 var MetersPerPixel = 1/PixelsPerMeter;		// .02 meter = 1 pixel
 var scalingOn = true;						// Toggle to see what the game looks like in box2d sizes =)
-var drawLines = true;						// Draw Debug lines
+var drawLines = false;						// Draw Debug lines
 // Timing
 var gameTime = 0;
 var lastTime = 0;
 var frameTime = 0;
 var accumulator = 0;
-var timestep = 1000/30;						// run 60 fixed physics steps, per second
-var deltaTime = deltaTime/1000;				// 0.0167: saves us frequent division while running (it's a fixed timestep)
-var interpolation = true;					// Draw pixi objects between physics states for smoother animation.
+var timestep = 1000/60;						// run 60 fixed physics steps, per second
+var deltaTime = timestep/1000;				// 0.0167: saves us frequent division while running (it's a fixed timestep)
+var interpolation = false;					// Draw pixi objects between physics states for smoother animation.
 
 // Planck
 var world = planck.World({
-	gravity: Vec2(0,9.81)			// approximate normal earth gravity
+	gravity: Vec2(0,0)			// approximate normal earth gravity
 });
-console.log(world)
+
+// GameObjects
+var gameObjects = [];				// Our list of GameObject instances.
+
 // Objects to play with.  Box2d objects are modelled as a body->fixture->shape.
+/*
 var player = world.createDynamicBody({
 		position:Vec2((renderer.screen.width/2)*MetersPerPixel,5),
 		userData: {
@@ -98,9 +113,8 @@ var player = world.createDynamicBody({
 			lastState: new PhysicsState()
 		}
 	});
-player.createFixture(planck.Circle(2));
-
-console.log(player)
+player.createFixture(planck.Circle(1),{restitution: 0.6,density:10});
+*/
 
 var ground = world.createBody({
 		userData: {
@@ -108,25 +122,48 @@ var ground = world.createBody({
 			label:"ground"
 		}
 	});
-ground.createFixture(planck.Edge(Vec2(1918*MetersPerPixel,0),Vec2(1918*MetersPerPixel,1000*MetersPerPixel)));
-ground.createFixture(planck.Edge(Vec2(0,1000*MetersPerPixel),Vec2(1920*MetersPerPixel,1000*MetersPerPixel)));
-ground.createFixture(planck.Edge(Vec2(2*MetersPerPixel,0),Vec2(2*MetersPerPixel,1000*MetersPerPixel)));
+var topLeft = Vec2(20*MetersPerPixel,20*MetersPerPixel);
+var topRight = Vec2(1900*MetersPerPixel,20*MetersPerPixel);
+var bottomLeft = Vec2(20*MetersPerPixel,1050*MetersPerPixel);
+var bottomRight = Vec2(1900*MetersPerPixel,1050*MetersPerPixel);
+
+ground.createFixture(planck.Edge(topLeft,topRight));//Vec2(1900*MetersPerPixel,0),Vec2(1900*MetersPerPixel,1050*MetersPerPixel)));
+ground.createFixture(planck.Edge(topRight,bottomRight));//Vec2(20*MetersPerPixel,1050*MetersPerPixel),Vec2(1900*MetersPerPixel,1050*MetersPerPixel)));
+ground.createFixture(planck.Edge(bottomRight,bottomLeft));//Vec2(20*MetersPerPixel,0),Vec2(20*MetersPerPixel,1050*MetersPerPixel)));
+ground.createFixture(planck.Edge(bottomLeft,topLeft));//Vec2(0,0),Vec2(1900*MetersPerPixel,0)));
 
 function step(t) {
 	if(lastTime) {
 		frameTime = t - lastTime;
-		if(frameTime > 250)
+		if(frameTime > 250) {
 			frameTime = 250;
+			// Panic!
+			destroyObject(5);
+			gameObjects.splice(0,1);
+		}
 		accumulator += frameTime;
 		while(accumulator >= timestep) {
+			for(let o = 0; o < gameObjects.length; o++) {
+				if(!gameObjects[o].body.isStatic()) gameObjects[o].update(deltaTime);
+			}
 			world.step(deltaTime);				// step box2d
 			gameTime += timestep;
 			accumulator -= timestep;
 		}
-		render();								// Them sweet pixels output by PIXI
+		render(accumulator / deltaTime);								// Them sweet pixels output by PIXI
 	}
 	lastTime = t;
 	requestAnimationFrame(step);
+}
+
+function destroyObject(num) {
+	console.log('-- destroying --');
+	//for(let a = 0; a < num; a++) {
+		console.log(gameObjects[0])
+		gameObjects[0].destroy();
+		// Splice from array
+		gameObjects.splice(0,1);
+	//}
 }
 
 /* 
@@ -136,69 +173,46 @@ function step(t) {
 
 	Lower the timestep to 10-20, and disable interpolation
 	for a visual on what this does.
+
+	World.prototype.clearForces = function() {
+  for (var body = this.m_bodyList; body; body = body.getNext()) {
+    body.m_force.setZero();
+    body.m_torque = 0.0;
+  }
+}
 */
 
-//interpolate
-/*
-		if(!this.physicsBody.isStatic()) {
-			//console.log('current: %s (%s), last: %s (%s)',this.physicsBody.getPosition().y, this.physicsBody.getAngle(), this.physicsLast.position.y, this.physicsLast.angle);
-			this.container.x = (this.physicsBody.getPosition().x * alpha) * PPM + (this.physicsLast.position.x * (1-alpha)) * PPM;
-			this.container.y = (this.physicsBody.getPosition().y * alpha) * PPM + (this.physicsLast.position.y * (1-alpha)) * PPM;
-		}
-		this.container.rotation = this.physicsBody.getAngle() * alpha + this.physicsLast.angle * (1-alpha);
-		//debug draw
-		this.debugLines.rotation = this.physicsBody.getAngle() * alpha + this.physicsLast.angle * (1-alpha);
-		this.debugLines.x = this.container.x;
-		this.debugLines.y = this.container.y;
-    	this.debugLines.clear();
-    	this.debugLines.lineStyle(2, 0xFEEB77, 1);
-		for(var fixture = this.physicsBody.getFixtureList(); fixture; fixture = fixture.getNext()) {
-			var shape = fixture.getShape();
-			this.debugLines.moveTo(shape.getVertex(0).x*PPM, shape.getVertex(0).y*PPM)
-			for(var v = 1; v < shape.m_count; v++) {
-				this.debugLines.lineTo(shape.getVertex(v).x*PPM,shape.getVertex(v).y*PPM);
-			}
-		}
-		this.debugLines.lineTo(shape.getVertex(0).x*PPM, shape.getVertex(0).y*PPM);
-		this.debugLines.endFill();
-*/
 function drawText() {
 	text.text = "Steps: " + world.m_stepCount + " ("+(world.m_stepCount / (gameTime/1000)).toFixed(2) + "/sec)";
-	text.text += "\nPlayer: " + player.getPosition();
+	text.text += "\n#: " + gameObjects.length + " frameTime: " + frameTime.toFixed(2);
+	text.text += "\nGravity: " + world.getGravity().y;
+	//text.text += "\nPlayer: " + (PixelsPerMeter*player.getPosition().x).toFixed(2) + ", " + (PixelsPerMeter*player.getPosition().y).toFixed(2);
+	//text.text += "\nangle: " + player.getAngle().toFixed(2);
 }
+  
 
-function render() {
+function render(alpha) {
+	
+	for(let o = 0; o < gameObjects.length; o++) {
+		gameObjects[o].integrate(alpha);
+	}
+
 	// Planck.js maintained box2d quite enthusiastically, including not-very-js ways of doing things.
 	// Being a C++ library written in ~2007, it iterates strangely for javascript programmers =)
+	// Also note, that most getters in planck.js are by reference! Whee! :D
+	// I did the level boundaries in a more vanilla way so we could see an example of that in action.
 	boundaryGraphics.clear();
 	for (var body = world.getBodyList(); body; body = body.getNext()) {
+		var userData = body.getUserData();
+		if("gameObject" in userData) continue;	// we skip to the next object if this is a gameObject (handled these above already)
 		for (var fixture = body.getFixtureList(); fixture; fixture = fixture.getNext()) {
-			var shape = fixture.getShape();	// we are assuming one fixture, otherwise we'd step into this as well
-			if(interpolation && !body.isStatic()) {
-
+			var shape = fixture.getShape();
+			if(drawLines && shape.getType() == 'edge' && userData.myType == 'boundary') {
+				boundaryGraphics.lineStyle(3,0xFEEB77,1);
+				boundaryGraphics.moveTo(shape.m_vertex1.x*PixelsPerMeter,shape.m_vertex1.y*PixelsPerMeter);
+				boundaryGraphics.lineTo(shape.m_vertex2.x*PixelsPerMeter,shape.m_vertex2.y*PixelsPerMeter);
 			}
-			if(drawLines) {
-				var userData = body.getUserData();
-				if(fixture.getType() == 'circle') {
-					boundaryGraphics.lineStyle(1,0xFEEB77,1);
-					boundaryGraphics.drawCircle(body.getPosition().x*PixelsPerMeter,body.getPosition().y*PixelsPerMeter,50)
-					boundaryGraphics.endFill();
-				}
-				if(fixture.getType() == 'polygon') {
-					boundaryGraphics.lineStyle(1,0xFEEB77,1);
-					boundaryGraphics.moveTo(shape.getVertex(0).x*PixelsPerMeter, shape.getVertex(0).y*PixelsPerMeter);
-					for(var v = 1; v < shape.m_count; v++) {
-						boundaryGraphics.lineTo(shape.getVertex(v).x*PixelsPerMeter, shape.getVertex(v).y*PixelsPerMeter);
-					}
-					boundaryGraphics.lineTo(shape.getVertex(0).x*PixelsPerMeter, shape.getVertex(0).y*PixelsPerMeter);
-				}
-				if(shape.getType() == 'edge') {
-					boundaryGraphics.lineStyle(3,0xFEEB77,1);
-					boundaryGraphics.moveTo(shape.m_vertex1.x*PixelsPerMeter,shape.m_vertex1.y*PixelsPerMeter);
-					boundaryGraphics.lineTo(shape.m_vertex2.x*PixelsPerMeter,shape.m_vertex2.y*PixelsPerMeter);
-				}
-			}
-		}
+		}	
 	}
 	boundaryGraphics.endFill();
 	drawText();
@@ -207,37 +221,201 @@ function render() {
 
 requestAnimationFrame(step);
 
+document.addEventListener('keydown',(ev) => {
+	console.log(ev.code)
+	/*
+	if(ev.code == "KeyW") {
+		player.setAwake(true);
+		player.applyLinearImpulse( Vec2(0,-100), player.getWorldCenter() );
+	}
+	if(ev.code == "KeyS") {
+		player.setAwake(true);
+		player.applyLinearImpulse( Vec2(0,100), player.getWorldCenter() );
+	}
+	if(ev.code == "KeyA") {
+		player.setAwake(true);
+		player.applyLinearImpulse( Vec2(-100,0), player.getWorldCenter() );
+	}
+	if(ev.code == "KeyD") {
+		player.setAwake(true);
+		player.applyLinearImpulse( Vec2(100,0), player.getWorldCenter() );
+	}
+	*/
+	if(ev.code == "NumpadAdd") {
+		world.setGravity({x:0,y:world.getGravity().y+0.5});
+	}
+	if(ev.code == "NumpadSubtract") {
+		world.setGravity({x:0,y:world.getGravity().y-0.5});
+	}
+	if(ev.code == 'Space') {
+		var o = new GameObject({
+			world: world,
+			position: {x:200,y:200},
+			angle: Math.random(),
+			size: { x:randrange(25,50), y: randrange(25,50) },
+			radius: randrange(25,50),
+			type: 'dynamic',
+			shape: 'circle',//randrange(1,100) > 50 ? 'box' : 'circle',
+			color: randcolor(),
+			restitution: randrange(1,100) / 100,
+			friction: randrange(1,100) / 100,
+			density: randrange(1,20),
+ 
+			texture: randrange(1,100) > 50 ? true : false 
+		});
+		o.body.applyLinearImpulse({x:randrange(50,500),y:randrange(50,500)},o.body.getWorldCenter());
+		gameObjects.push(o);
+		/*
+		var b = world.createDynamicBody({
+			position:Vec2((renderer.screen.width/2)*MetersPerPixel,5),
+			userData: {
+				myType: "body",
+				lastState: new PhysicsState()
+			}
+		});
+		b.createFixture(planck.Circle(0.5),{restitution: 0.8,density: 2});
+		*/
+	}
+});
+
+
 // Some simple classes, for sanity.
 
-class BoxObject {
-	constructor(opts) {									// x,y,sizeX,sizeY,stage,color,physicsWorld,fixtureOptions
-		this.sprite = new PIXI.Graphics();				// I mean, a sprite would normally be a texture but simple geometry works for our needs.
+/*
+	Making box2d bodies is fairly verbose, and the difference between Bodies, Fixtures, and Shapes is a bit confusing.
+
+	I've made these simple classes to make the process a bit easier. It doesn't recognize every parameter, but it does
+	merge the most common ones so you don't have to do body definitions, then fixture definitions.
+*/
+
+class GameObject {
+	constructor(opts) {// x,y,sizeX,sizeY,stage,color,physicsWorld,fixtureOptions
+		/*
+			position: {x:0,y:0} 			a valid box2d Vec2 for the starting position
+			angle: int 						an initial rotation value, in radians
+			size: {x:0,y:0}					used by boxes, x=width,y=height (does nothing for circles)
+			radius: number					used for circles, ignored by boxes.
+			parent: PIXI.container 			the thing to add this to (probably stage, but i hate assuming with classes)
+			world: Planck.World 			our box2d world
+			color: 0x000000 				a hex color code for the shape, if no texture is present.
+			texture: key 					the pixi loader key for your texture.
+
+			shape: type (string)			the type of shape to use for box2d, ie: 'box' or 'circle', for now.
+			type: string					dynamic, static, kinematic
+
+			friction: float
+			restitution: float
+			density: float
+		*/
+		this.sprite = opts.texture ? new PIXI.Sprite.from('bunny.png') : new PIXI.Graphics();		// So, if no texture is supplied we become a solid shape.
+		this.debug = new PIXI.Graphics();				// I mean, a sprite would normally be a texture but simple geometry works for our needs.
 		this.container = new PIXI.Container();			// If we containerize our whole object, everything stays together nicely.
+		this.shapeType = opts.shape;
+		this.world = opts.world;
 
-		this.body = physicsWorld.createBody();
-		// box2d builds shapes from it's center of mass origin
-		// aka, this is radius*2, so we half what we send, because that makes sense in my head (300px means 300px, not 150!)
-		// ...and don't forget to scale it.
-		this.body.createFixture(planck.Box(opts.sizeX/2/PPM,opts.sizeY/2/PPM),fixtureOptions);
-		this.body.setPosition(planck.Vec2(x,y));
+		this.body = this.world.createBody({
+			type: opts.type,
+			//angularVelocity: 100,
+			position: { x: opts.position.x * MetersPerPixel, y: opts.position.y * MetersPerPixel },
+			userData: {									// We assign some userData for this body for future handling
+				gameObject:true
+			}
+		});
+		
+		if(this.shapeType == 'box') {
+			this.body.createFixture(planck.Box((opts.size.x/2)*MetersPerPixel,(opts.sizeY/2)*MetersPerPixel),{
+				friction: opts.friction,
+				restitution: opts.restitution,
+				density: opts.density
+			});
+			if(!opts.texture) {
+				this.sprite.beginFill(opts.color,1); 
+				this.sprite.drawRect(0,0, opts.size.x, opts.size.y);
+				this.sprite.endFill();
+			}
+		}
+		else if(this.shapeType == 'circle') {
+			this.body.createFixture(planck.Circle(opts.radius*MetersPerPixel), {
+				friction: opts.friction,
+				restitution: opts.restitution,
+				density: opts.density
+			});
+			if(!opts.texture) {
+				this.sprite.beginFill(opts.color,1);
+				this.sprite.drawCircle(0,0,opts.radius);
+				this.sprite.endFill();
+			}
+		} else throw("Unsupported physics shape!");
 
-		// Our sprite is just a box.
-		this.sprite.beginFill(opts.color);
-		this.sprite.drawRect(x, y, opts.sizeX, opts.sizeY);
-		this.sprite.endFill();
+		this.previousState = new PhysicsState();		// For interpolation, we need to know our Body's previous physics state.
 
 		// center origin works for most folks, and box2d uses center of mass as well, so we do this now.
-		this.sprite.pivot.x = this.sprite.width / 2;
-		this.sprite.pivot.y = this.sprite.height / 2;
+		if(opts.texture) {
+			this.sprite.pivot.x = this.sprite.width / 2;
+			this.sprite.pivot.y = this.sprite.height / 2;
+			this.sprite.scale.set(opts.radius*MetersPerPixel*4,opts.radius*MetersPerPixel*4);
+		}
 		this.container.pivot.x = this.container.width / 2;
 		this.container.pivot.y = this.container.height / 2;
 
+		this.debug.x = this.container.x = opts.position.x;
+		this.debug.y = this.container.y = opts.position.y;
+
 		this.container.addChild(this.sprite);
 
-		stage.add(this.container);
-		debugLines.addChild(this.debugLines);				// Add shape outlines above object layer.
+		spriteLayer.addChild(this.container);				// add to stage for rendering
+		debugLayer.addChild(this.debug);			// Add debug lines layer (so they appear above our stage)
+		gameObjects.push(this);						// Finally, we add ourselves to the list of game objects for future iteration.
+
+		console.log(opts)
+		console.log(this);
+	}
+	integrate(alpha) {
+		// Interpolate or snap
+		this.container.x = interpolation ? (this.body.getPosition().x * alpha) * PixelsPerMeter + (this.previousState.position.x * (1-alpha)) * PixelsPerMeter : this.body.getPosition().x * PixelsPerMeter;
+		this.container.y = interpolation ? (this.body.getPosition().y * alpha) * PixelsPerMeter + (this.previousState.position.y * (1-alpha)) * PixelsPerMeter : this.body.getPosition().y * PixelsPerMeter;
+		this.container.rotation = interpolation ? this.body.getAngle() * alpha + this.previousState.angle * (1-alpha) : this.body.getAngle();	// we don't convert rotations
+
+		//console.log(this.body.getAngle())
+		// Debug lines
+		if(drawLines) {
+			this.debug.x = this.container.x;
+			this.debug.y = this.container.y;
+			this.debug.rotation = interpolation ? this.body.getAngle() * alpha + this.previousState.angle * (1-alpha) : this.body.getAngle();
+			this.debug.clear();
+			this.debug.lineStyle(1,0x00ff2a,1);
+			if(this.shapeType == 'box') { // try to just drawRect lol ?
+				for(var fixture = this.body.getFixtureList(); fixture; fixture = fixture.getNext()) {
+					var shape = fixture.getShape();
+					this.debug.moveTo(shape.getVertex(0).x * PixelsPerMeter, shape.getVertex(0).y * PixelsPerMeter);
+					for(var v = 1; v < shape.m_count; v++) {
+						this.debug.lineTo(shape.getVertex(v).x * PixelsPerMeter, shape.getVertex(v).y * PixelsPerMeter);
+					}
+					this.debug.lineTo(shape.getVertex(0).x * PixelsPerMeter, shape.getVertex(0).y * PixelsPerMeter);
+				}
+			}
+			else if(this.shapeType == 'circle') {
+				var r = this.body.getFixtureList().getShape().m_radius;
+				this.debug.drawCircle(0,0,r * PixelsPerMeter);
+			}
+			this.debug.endFill();
+		}
+	}
+	update() {
+		this.previousState.assign(this.body.getPosition(),this.body.getAngle());
+	}
+	destroy() {
+		// Goodbye, sweet world
+		// box2d
+		this.world.destroyBody(this.body);
+		// pixi
+		this.container.destroy({children: true});
+		this.debug.destroy()
 	}
 }
+
+function randrange(min,max) { return Math.floor(Math.random() * (Math.floor(max) - Math.ceil(min) + 1)) + Math.ceil(min); }
+function randcolor() { return '0x'+Math.floor(Math.random()*16777215).toString(16) }
 </script>
 </body>
 </html>
