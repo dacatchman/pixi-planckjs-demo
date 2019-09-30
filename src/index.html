@@ -65,7 +65,7 @@ var accumulator = 0;
 var timestep = 1000/60;						// run X fixed physics steps, per second.  Try turning this to 20 and interpolation to false.
 var deltaTime = timestep/1000;				// Since we're fixed, we don't need to divide constantly during simulation.
 var interpolation = true;					// Draw PIXI objects between physics states for smoother animation.
-var forceStrength = 5;						// How much power our bunnies posses.
+var forceStrength = 25;						// How much power our bunnies posses.
 var deleteQueued = false;					// Destroying stuff during a physics step would be crashy.
 
 // Our main Box2D world.
@@ -156,7 +156,6 @@ function render(alpha) {
 // When files are loaded and ready, we may begin.
 loader.add('bunny','bunny.png')
 	.load( (loader,resources) => {
-		console.log("All files loaded!")
 		requestAnimationFrame(step);
 	});
 // Input
@@ -164,7 +163,6 @@ document.addEventListener('keyup', (ev) => {
 	
 });
 document.addEventListener('keydown',(ev) => {
-	//console.log(ev.code)
 	if(ev.code == "Delete") {
 		deleteQueued = true;
 	}
