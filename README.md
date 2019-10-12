@@ -1,6 +1,6 @@
 # PIXI.js + Planck.js, A Demonstration
 
-![pixi+planck](https://github.com/dacatchman/pixi-planckjs-demo/screenshot.png)
+![pixi+planck](https://github.com/dacatchman/pixi-planckjs-demo/blob/master/screenshot.png)
 
 This project is provided as a demonstration for using Planck.js (Box2D) with PIXI.js.  In addition, it (should) demonstrate a proper custom game loop with fixed timesteps for physics simulation and smooth animation via interpolation (if I learned anything from gaffer, that is).
 

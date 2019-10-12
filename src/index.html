@@ -62,7 +62,7 @@ var gameTime = 0;							// Elapsed time since updating began.
 var lastTime = 0;
 var frameTime = 0;
 var accumulator = 0;
-var timestep = 1000/60;						// run X fixed physics steps, per second.  Try turning this to 20 and interpolation to false.
+var timestep = 1000/30;						// run X fixed physics steps, per second.  Try turning this to 20 and interpolation to false.
 var deltaTime = timestep/1000;				// Since we're fixed, we don't need to divide constantly during simulation.
 var interpolation = true;					// Draw PIXI objects between physics states for smoother animation.
 var forceStrength = 25;						// How much power our bunnies posses.
@@ -294,7 +294,7 @@ class GameObject {
 		this.debug.y = this.container.y = opts.position.y;
 		debugLayer.addChild(this.debug);			
 		// Finally, we add ourselves to the list of game objects for future iteration.
-		gameObjects.push(this);						
+		gameObjects.push(this);
 	}
 	integrate(alpha) {
 		// Interpolate or snap?
