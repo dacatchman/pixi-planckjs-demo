@@ -2,7 +2,9 @@
 <html>
 <head>
 	<meta charset="UTF-8">
-	<title>Hello World!</title>
+	<title>PIXI+Planck Demo</title>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/planck-js/0.2.7/planck.js"></script>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/5.1.5/pixi.min.js"></script>
 	<style>
 		html, body {
 			margin: 0;
@@ -16,8 +18,6 @@
 <body>
 <script>
 // Node integration thanks to Electron (otherwise you would source these in the head tag, like normal)
-const PIXI = require('PIXI.js');
-const planck = require('planck-js');
 // PIXI
 const renderer = new PIXI.Renderer({width: 1920, height: 1080, backgroundColor: 0x000000 });
 document.body.appendChild(renderer.view);
@@ -154,7 +154,7 @@ function render(alpha) {
 	renderer.render(stage);
 }
 // When files are loaded and ready, we may begin.
-loader.add('bunny','bunny.png')
+loader.add('bunny','https://pixijs.io/examples/examples/assets/bunny.png')
 	.load( (loader,resources) => {
 		requestAnimationFrame(step);
 	});
