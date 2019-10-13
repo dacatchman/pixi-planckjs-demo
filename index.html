@@ -169,7 +169,7 @@ function render(alpha) {
 	renderer.render(stage);
 }
 // When files are loaded and ready, we may begin.
-loader.add('bunny','https://github.com/dacatchman/pixi-planckjs-demo/blob/master/src/bunny.png?raw=true')
+loader.add('bunny','bunny.png')
 	.load( (loader,resources) => {
 		requestAnimationFrame(step);
 	});
