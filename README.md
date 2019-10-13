@@ -1,6 +1,6 @@
 # PIXI.js + Planck.js, A Demonstration
 
-![pixi+planck](https://github.com/dacatchman/pixi-planckjs-demo/screenshot.png)
+![pixi+planck](https://github.com/dacatchman/pixi-planckjs-demo/blob/master/screenshot.png?raw=true)
 
 This project is provided as a demonstration for using Planck.js (Box2D) with PIXI.js.  In addition, it (should) demonstrate a proper custom game loop with fixed timesteps for physics simulation and smooth animation via interpolation (if I learned anything from gaffer, that is).
 
@@ -10,7 +10,7 @@ Please visit [Plank.js](https://github.com/shakiba/planck.js/) and [PIXI.js](htt
 
 ## Live Demo
 
-There is now a livedemo of this demo at [github pages](https://dacatchman.github.io/pixi-planckjs-demo/).
+There is now a live demo hosted by [GitHub Pages](https://dacatchman.github.io/pixi-planckjs-demo/).
 
 ## Usage
 
@@ -24,6 +24,12 @@ npm start
 This does use electron for a (lazy) webserver and integrated environment for testing.  Otherwise, feel free to run index.html in your own webserver, as you are probably used to doing for html5 development.  The only other file required is bunny.png, but you can use any image you'd like.  I borrowed this one from the PIXI website.
 
 In the index.html file you will find a bunch of variables you can tune and tweak to see the outcomes.  It's a sandbox, so go nuts.  The code is documented enough, but feel free to ask me any questions.
+
+## New Stuff
+
+The most recent release features triangle shapes.  More flags are provided, such as interpolation, bullet mode, and the ability to increase or decrease the physics timestep in real time.
+
+Try turning off interpolation and lowering the physics steps to see how cool and important this feature can be.
 
 ## Additional Thoughts
 
