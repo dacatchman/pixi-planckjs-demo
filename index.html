@@ -3,7 +3,7 @@
 <head>
 	<meta charset="UTF-8">
 	<title>PIXI+Planck Demo</title>
-	<script src="https://cdnjs.cloudflare.com/ajax/libs/planck-js/0.2.7/planck.js"></script>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/planck-js/0.2.7/planck.min.js"></script>
 	<script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/5.1.5/pixi.min.js"></script>
 	<style>
 		html, body {
@@ -62,10 +62,10 @@ var gameTime = 0;							// Elapsed time since updating began.
 var lastTime = 0;
 var frameTime = 0;
 var accumulator = 0;
-var timestep = 1000/30;						// run X fixed physics steps, per second.  Try turning this to 20 and interpolation to false.
+var timestep = 1000/60;						// run X fixed physics steps, per second.  Try turning this to 20 and interpolation to false.
 var deltaTime = timestep/1000;				// Since we're fixed, we don't need to divide constantly during simulation.
 var interpolation = true;					// Draw PIXI objects between physics states for smoother animation.
-var forceStrength = 25;						// How much power our bunnies posses.
+var forceStrength = 50;						// How much power our bunnies posses.
 var deleteQueued = false;					// Destroying stuff during a physics step would be crashy.
 
 // Our main Box2D world.
