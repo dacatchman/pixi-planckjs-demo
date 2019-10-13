@@ -249,7 +249,7 @@ document.addEventListener('keydown',(ev) => {
 			restitution: randrange(1,50) / 100,
 			friction: randrange(1,50) / 100,
 			density: randrange(r,r*2),
-			texture: 'bunny.png' 
+			texture: 'bunny' 
 		});
 		var force = planck.Vec2(forceStrength,forceStrength).mul(deltaTime*PixelsPerMeter*o.body.m_mass);
 		o.body.applyLinearImpulse(force,o.body.getWorldCenter());
