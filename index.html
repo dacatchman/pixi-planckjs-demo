@@ -203,7 +203,7 @@ document.addEventListener('keydown',(ev) => {
 			restitution: randrange(1,50) / 100,
 			friction: randrange(1,50) / 100,
 			density: randrange(r,r*2),
-			texture: 'bunny.png' 
+			texture: 'bunny' 
 		});
 		o.body.applyLinearImpulse({x:randrange(forceStrength,forceStrength*2),y:randrange(forceStrength,forceStrength*2)},o.body.getWorldCenter());
 	}
