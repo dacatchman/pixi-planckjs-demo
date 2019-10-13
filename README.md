@@ -8,6 +8,10 @@ Please note that the priority of this project was to get Planck.js and PIXI work
 
 Please visit [Plank.js](https://github.com/shakiba/planck.js/) and [PIXI.js](https://github.com/pixijs/pixi.js) for more.
 
+## Live Demo
+
+There is now a livedemo of this demo at [github pages](https://dacatchman.github.io/pixi-planckjs-demo/).
+
 ## Usage
 
 Clone the repo of course, and then:
