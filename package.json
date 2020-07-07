@@ -22,7 +22,7 @@
   },
   "homepage": "https://github.com/dacatchman/pixi-planckjs-demo#readme",
   "devDependencies": {
-    "electron": "^6.0.10"
+    "electron": "^9.1.0"
   },
   "dependencies": {
     "pixi.js": "^5.1.5",
